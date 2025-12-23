@@ -1,57 +1,29 @@
-use anyhow::{Context, Result};
-use candle_core::{DType, Device, Tensor};
-use candle_nn::VarBuilder;
-use candle_transformers::models::qwen3::{Config as Qwen3Config, ModelForCausalLM as Qwen3Model};
-use std::path::PathBuf;
+use anyhow::Result;
+use burn::prelude::*;
 
-/// Load Qwen3 model from multiple safetensors files
-pub fn load_model(
-    model_paths: &[PathBuf],
-    config_path: &PathBuf,
-    device: &Device,
-) -> Result<Qwen3Model> {
-    tracing::info!("Loading model config from: {:?}", config_path);
-
-    // Load config
-    let config_str = std::fs::read_to_string(config_path).context("Failed to read config file")?;
-    let config: Qwen3Config =
-        serde_json::from_str(&config_str).context("Failed to parse Qwen3 config")?;
-
-    tracing::info!("Loading model weights from {} files...", model_paths.len());
-
-    // Load model weights from safetensors with BF16 for best Metal performance
-    let vb = unsafe {
-        VarBuilder::from_mmaped_safetensors(model_paths, DType::BF16, device)
-            .context("Failed to load model from safetensors")?
-    };
-
-    tracing::info!("Building Qwen3 model...");
-    let model = Qwen3Model::new(&config, vb).context("Failed to build Qwen3 model")?;
-
-    tracing::info!("✓ Model loaded successfully");
-    Ok(model)
-}
-
-/// Sample next token from logits with repetition penalty
-pub fn sample_token(
-    logits: &Tensor,
+/// Sample next token from logits with repetition penalty (Burn version)
+pub fn sample_token_burn<B: burn::tensor::backend::Backend>(
+    logits: &Tensor<B, 1>,
     temperature: f64,
     top_p: f64,
     repeat_penalty: f32,
     previous_tokens: &[u32],
 ) -> Result<u32> {
-    let mut logits = logits.to_vec1::<f32>()?;
-
+    // Convert tensor to Vec<f32>
+    let logits_data = logits.to_data();
+    let logits_slice = logits_data.as_slice::<f32>().unwrap_or(&[]);
+    let mut logits_vec = logits_slice.to_vec();
+    
     // Apply repetition penalty to previously generated tokens
     if repeat_penalty != 1.0 {
         for &token_id in previous_tokens {
             let idx = token_id as usize;
-            if idx < logits.len() {
+            if idx < logits_vec.len() {
                 // Penalize by dividing if logit is positive, multiplying if negative
-                if logits[idx] > 0.0 {
-                    logits[idx] /= repeat_penalty;
+                if logits_vec[idx] > 0.0 {
+                    logits_vec[idx] /= repeat_penalty;
                 } else {
-                    logits[idx] *= repeat_penalty;
+                    logits_vec[idx] *= repeat_penalty;
                 }
             }
         }
@@ -60,8 +32,8 @@ pub fn sample_token(
     if temperature <= 0.0 {
         // Greedy sampling
         let mut best_idx = 0;
-        let mut best_logit = logits[0];
-        for (idx, &logit) in logits.iter().enumerate().skip(1) {
+        let mut best_logit = logits_vec[0];
+        for (idx, &logit) in logits_vec.iter().enumerate().skip(1) {
             if logit > best_logit {
                 best_logit = logit;
                 best_idx = idx;
@@ -71,7 +43,7 @@ pub fn sample_token(
     }
 
     // Apply temperature
-    let mut probs: Vec<f32> = logits
+    let mut probs: Vec<f32> = logits_vec
         .iter()
         .map(|&l| (l / temperature as f32).exp())
         .collect();
@@ -139,3 +111,5 @@ pub fn sample_token(
     // Fallback
     Ok((probs.len() - 1) as u32)
 }
+
+

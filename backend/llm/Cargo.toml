@@ -6,10 +6,13 @@ edition = { workspace = true }
 
 
 [dependencies]
-# Candle ML framework (using git for latest Qwen3 support)
-candle-core = { git = "https://github.com/huggingface/candle.git" }
-candle-transformers = { git = "https://github.com/huggingface/candle.git" }
-candle-nn = { git = "https://github.com/huggingface/candle.git" }
+# Burn ML framework
+burn = { version = "0.20.0-pre.6", default-features = false }
+burn-ndarray = { version = "0.20.0-pre.6", optional = true }
+burn-wgpu = { version = "0.20.0-pre.6", optional = true }
+burn-cuda = { version = "0.20.0-pre.6", optional = true }
+burn-candle = { version = "0.20.0-pre.6", optional = true }
+burn-import = { version = "0.20.0-pre.6", features = ["safetensors"] }
 
 # Tokenization
 tokenizers = { version = "0.21", default-features = false, features = ["onig"] }
@@ -31,8 +34,10 @@ tracing = "0.1"
 tokio = { version = "1.42", features = ["full"] }
 
 [features]
-default = ["metal"]
+default = ["ndarray"]
 
-# GPU acceleration
-metal = ["candle-core/metal", "candle-nn/metal", "candle-transformers/metal"]
-cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
+# Backend features
+ndarray = ["burn/ndarray", "burn-ndarray"]
+wgpu = ["burn/wgpu", "burn-wgpu"]
+cuda = ["burn/cuda", "burn-cuda"]
+candle = ["burn/candle", "burn-candle"]
