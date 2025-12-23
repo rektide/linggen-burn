@@ -11,6 +11,7 @@ burn = { version = "0.20.0-pre.6", default-features = false }
 burn-ndarray = { version = "0.20.0-pre.6", optional = true }
 burn-wgpu = { version = "0.20.0-pre.6", optional = true }
 burn-cuda = { version = "0.20.0-pre.6", optional = true }
+burn-rocm = { version = "0.20.0-pre.6", optional = true }
 burn-candle = { version = "0.20.0-pre.6", optional = true }
 burn-import = { version = "0.20.0-pre.6", features = ["safetensors"] }
 
@@ -36,8 +37,13 @@ tokio = { version = "1.42", features = ["full"] }
 [features]
 default = ["ndarray"]
 
-# Backend features
+# Backend features (choose ONE at compile time)
 ndarray = ["burn/ndarray", "burn-ndarray"]
 wgpu = ["burn/wgpu", "burn-wgpu"]
 cuda = ["burn/cuda", "burn-cuda"]
+rocm = ["burn/rocm", "burn-rocm"]
 candle = ["burn/candle", "burn-candle"]
+
+# Note: For runtime backend selection, users should build multiple binaries
+# with different features and select at runtime, or use a more complex
+# build system with dynamic loading
