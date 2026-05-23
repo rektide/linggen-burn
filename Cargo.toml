@@ -13,6 +13,11 @@ repository = "https://github.com/linggen/linggen"
 # Disable at compile time: cargo build --no-default-features.
 default = ["telemetry"]
 telemetry = []
+burn = ["dep:burn", "dep:burn-store", "dep:hf-hub", "dep:tokenizers", "burn-ndarray"]
+burn-ndarray = ["burn/ndarray"]
+burn-wgpu = ["burn/wgpu"]
+burn-cuda = ["burn/cuda"]
+burn-rocm = ["burn/rocm"]
 
 [[bin]]
 name = "ling"
@@ -61,3 +66,7 @@ gethostname = "1.1.0"
 open = "5.3.3"
 urlencoding = "2.1.3"
 flate2 = "1.1.9"
+burn = { version = "0.21", default-features = false, features = ["std", "store"], optional = true }
+burn-store = { version = "0.21", optional = true }
+hf-hub = { version = "1.0.0-rc.1", features = ["blocking", "rustls-tls"], optional = true }
+tokenizers = { version = "0.22", default-features = false, features = ["onig"], optional = true }

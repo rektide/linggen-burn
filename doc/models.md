@@ -25,6 +25,7 @@ Linggen supports multiple model providers. Each has a dedicated `provider` value
 |:---------|:-----|:-----------------|:-----|
 | ChatGPT (Subscription) | Cloud | `chatgpt` | OAuth (`ling auth login`) |
 | Ollama | Local | `ollama` | None |
+| Burn (experimental) | Local | `burn` | None |
 | Google Gemini | Cloud | `gemini` | API key |
 | OpenAI | Cloud | `openai` | API key |
 | Groq | Cloud | `groq` | API key |
@@ -33,6 +34,20 @@ Linggen supports multiple model providers. Each has a dedicated `provider` value
 | GitHub Models | Cloud | `github` | API key |
 
 All cloud providers (except ChatGPT) use the OpenAI-compatible chat completions API. You can also use `provider = "openai"` with any OpenAI-compatible endpoint (vLLM, LM Studio, etc.).
+
+### Experimental: Burn local provider
+
+`provider = "burn"` is compiled out by default. Build with `cargo build --features burn` to enable local Burn metadata/tokenizer loading.
+
+```toml
+[[models]]
+id = "local-qwen-burn"
+provider = "burn"
+model = "Qwen/Qwen2.5-0.5B-Instruct"
+supports_tools = false
+```
+
+The provider is text-only and does not support native tool calling. Full transformer weight mapping from Hugging Face safetensors is still incomplete.
 
 ### Default: ChatGPT via subscription
 

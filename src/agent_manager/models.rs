@@ -3,6 +3,8 @@ use crate::provider::codex_auth;
 use crate::config::ModelConfig;
 use crate::credentials::{self, Credentials};
 use crate::message::ChatMessage;
+#[cfg(feature = "burn")]
+use crate::provider::burn::BurnClient;
 use crate::provider::ollama::OllamaClient;
 use crate::provider::openai::OpenAiClient;
 use anyhow::Result;
@@ -148,6 +150,10 @@ enum ProviderClient {
     Ollama(OllamaClient),
     OpenAi(OpenAiClient),
     Anthropic(AnthropicClient),
+    #[cfg(feature = "burn")]
+    Burn(BurnClient),
+    #[cfg(not(feature = "burn"))]
+    BurnUnavailable,
     Proxy(Arc<super::proxy_provider::ProxyModelClient>),
 }
 
@@ -257,6 +263,17 @@ impl ModelManager {
                         cfg.url.clone(),
                         cfg.api_key.clone(),
                     ))
+                }
+                "burn" => {
+                    cfg.supports_tools = Some(false);
+                    #[cfg(feature = "burn")]
+                    {
+                        ProviderClient::Burn(BurnClient::new(cfg.model.clone()))
+                    }
+                    #[cfg(not(feature = "burn"))]
+                    {
+                        ProviderClient::BurnUnavailable
+                    }
                 }
                 _ if is_chatgpt_oauth => {
                     // ChatGPT OAuth: use subscription tokens
@@ -437,6 +454,23 @@ impl ModelManager {
                     },
                 )))
             }
+            #[cfg(feature = "burn")]
+            ProviderClient::Burn(client) => {
+                let stream = client.chat_text_stream(messages).await?;
+                Ok(Box::pin(futures_util::stream::unfold(
+                    (stream, _permit),
+                    |(mut stream, permit)| async move {
+                        match stream.next().await {
+                            Some(item) => Some((item, (stream, permit))),
+                            None => None,
+                        }
+                    },
+                )))
+            }
+            #[cfg(not(feature = "burn"))]
+            ProviderClient::BurnUnavailable => {
+                anyhow::bail!("burn provider requires `cargo build --features burn`")
+            }
             ProviderClient::Proxy(client) => {
                 let stream = client.inference_stream(&instance.config.model, messages, None).await?;
                 Ok(Box::pin(futures_util::stream::unfold(
@@ -553,6 +587,14 @@ impl ModelManager {
                         }
                     },
                 )))
+            }
+            #[cfg(feature = "burn")]
+            ProviderClient::Burn(_) => {
+                anyhow::bail!("burn provider does not support native tool calling")
+            }
+            #[cfg(not(feature = "burn"))]
+            ProviderClient::BurnUnavailable => {
+                anyhow::bail!("burn provider requires `cargo build --features burn`")
             }
             ProviderClient::Proxy(client) => {
                 let stream = client.inference_stream(&instance.config.model, messages, Some(tools)).await?;
@@ -686,6 +728,10 @@ impl ModelManager {
                     .await;
                 Ok(*value?)
             }
+            #[cfg(feature = "burn")]
+            ProviderClient::Burn(client) => client.context_window().await,
+            #[cfg(not(feature = "burn"))]
+            ProviderClient::BurnUnavailable => Ok(Some(Self::guess_context_window(&instance.config.model))),
             ProviderClient::Proxy(_) => {
                 // Proxy models: use config context_window or a conservative default
                 Ok(instance.config.context_window.or(Some(128000)))
@@ -770,6 +816,10 @@ impl ModelManager {
                     Ok(true)
                 }
             }
+            #[cfg(feature = "burn")]
+            ProviderClient::Burn(_) => Ok(false),
+            #[cfg(not(feature = "burn"))]
+            ProviderClient::BurnUnavailable => Ok(false),
             ProviderClient::Proxy(_) => Ok(false),
         }
     }

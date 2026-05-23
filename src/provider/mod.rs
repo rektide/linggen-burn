@@ -6,6 +6,8 @@
 //! [`crate::agent_manager::models`].
 
 pub mod anthropic;
+#[cfg(feature = "burn")]
+pub mod burn;
 pub mod claude_auth;
 pub mod codex_auth;
 pub mod ollama;
